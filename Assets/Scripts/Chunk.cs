@@ -26,11 +26,21 @@ public class Chunk : MonoBehaviour
 	protected MeshRenderer meshRenderer;
 	protected MeshCollider meshCollider;
 	protected MeshFilter meshFilter;
+	static Vector3 grain0Offset;
+	static Vector3 grain1Offset;
+	static Vector3 grain2Offset;
+
+
 
 	// Use this for initialization
 	void Start () {
 
 		chunks.Add(this);
+		Random.seed = World.currentWorld.seed;
+		grain0Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
+		grain1Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
+		grain2Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
+
 		meshRenderer = GetComponent<MeshRenderer>();
 		meshCollider = GetComponent<MeshCollider>();
 		meshFilter = GetComponent<MeshFilter>();
@@ -44,17 +54,8 @@ public class Chunk : MonoBehaviour
 	
 	}
 
-	public static byte GetTheoreticalByte(Vector3 pos)
-	{
-		Random.seed = World.currentWorld.seed;
-		Vector3 grain0Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
-		Vector3 grain1Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
-		Vector3 grain2Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
 
-		return GetTheoreticalByte (pos, grain0Offset, grain1Offset, grain2Offset);
-	}
-
-	public static byte GetTheoreticalByte(Vector3 pos, Vector3 grain0Offset, Vector3 grain1Offset, Vector3 grain2Offset)
+	public virtual byte GetTheoreticalByte(Vector3 pos)
 	{
 
 		byte brick = 1;
@@ -69,11 +70,11 @@ public class Chunk : MonoBehaviour
 		
 		mountainValue += (CalculateNoiseValue(pos, grain0Offset,0.05f) *10)-5;
 		mountainValue += CalculateNoiseValue(pos, grain2Offset,0.03f);
-		if (mountainValue > y)
+		if (mountainValue > pos.y)
 			return 1;
 		
 		//cant fall through
-		if (y <=1)
+		if (pos.y <=1)
 			return 1;
 		return 0;
 	}
@@ -81,13 +82,6 @@ public class Chunk : MonoBehaviour
 
 	public virtual void CalculateMapFromScratch()
 	{
-		Random.seed = World.currentWorld.seed;
-		Vector3 grain0Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
-		Vector3 grain1Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
-		Vector3 grain2Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
-		
-
-
 
 		map = new byte[width, width, height];
 		
