@@ -5,7 +5,7 @@ public class World : MonoBehaviour {
 
 	public static World currentWorld;
 
-	public int chunkWidth = 20, chunkHeight = 20, seed =0;
+	public int chunkWidth = 60, chunkHeight = 60, seed =0;
 	public float viewRange = 30;
 
 	public Chunk chunkFab;
@@ -30,8 +30,14 @@ public class World : MonoBehaviour {
 				Debug.Log(pos);
 				Chunk chunk = Chunk.FindChunk(pos);
 
-				if (chunk != null)
+				if (chunk == null)
+					Debug.Log (pos+ ":NO Chunk");
+				else
+				{
+					Debug.Log(pos + ":chunk at " + chunk.transform.position);
 					continue;
+				}
+
 				chunk = (Chunk)Instantiate(chunkFab, pos, Quaternion.identity);
 			} 
 		} 

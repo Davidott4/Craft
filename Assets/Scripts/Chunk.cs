@@ -35,28 +35,7 @@ public class Chunk : MonoBehaviour
 		meshCollider = GetComponent<MeshCollider>();
 		meshFilter = GetComponent<MeshFilter>();
 
-		
-		map = new byte[width, width, height];
-
-		for (int x=0; x < width; x++)
-		{
-			float noiseX = (float) x/20;
-			for (int y=0; y < height; y++)
-			{
-				float noiseY = (float) y/20;
-				for (int z=0; z < width; z++)
-				{
-					float noiseZ = (float) z/20;
-					float noiseValue = Noise.Generate(noiseX,noiseY,noiseZ);
-					noiseValue += (10f-(float)y) /10;
-					noiseValue /= (float) y/5;
-
-					if (noiseValue > 0.2f)
-						map[x,y,z] = 1;
-
-				}
-			}
-		}
+		CalculateMapFromScratch ();
 		StartCoroutine(CreateVisualMesh());
 	}
 	
@@ -64,6 +43,76 @@ public class Chunk : MonoBehaviour
 	void Update () {
 	
 	}
+
+	public static byte GetTheoreticalByte(Vector3 pos)
+	{
+		Random.seed = World.currentWorld.seed;
+		Vector3 grain0Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
+		Vector3 grain1Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
+		Vector3 grain2Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
+
+		return GetTheoreticalByte (pos, grain0Offset, grain1Offset, grain2Offset);
+	}
+
+	public static byte GetTheoreticalByte(Vector3 pos, Vector3 grain0Offset, Vector3 grain1Offset, Vector3 grain2Offset)
+	{
+
+		byte brick = 1;
+
+		float heightBase = 10;
+		float maxHeight = height - 10;
+		float heightSwing = height - heightBase;
+
+		float mountainValue = CalculateNoiseValue(pos, grain1Offset,0.009f);
+		mountainValue *= heightSwing;
+		mountainValue +=heightBase;
+		
+		mountainValue += (CalculateNoiseValue(pos, grain0Offset,0.05f) *10)-5;
+		mountainValue += CalculateNoiseValue(pos, grain2Offset,0.03f);
+		if (mountainValue > y)
+			return 1;
+		
+		//cant fall through
+		if (y <=1)
+			return 1;
+		return 0;
+	}
+
+
+	public virtual void CalculateMapFromScratch()
+	{
+		Random.seed = World.currentWorld.seed;
+		Vector3 grain0Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
+		Vector3 grain1Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
+		Vector3 grain2Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
+		
+
+
+
+		map = new byte[width, width, height];
+		
+		for (int x=0; x < width; x++)
+		{
+			for (int y=0; y < height; y++)
+			{
+				for (int z=0; z < width; z++)
+				{
+					map[x,y,z] = GetTheoreticalByte(new Vector3(x,y,z) + transform.position);
+				}
+			}
+		}
+	}
+
+	public virtual float CalculateNoiseValue(Vector3 pos, Vector3 offset, float scale)
+	{
+		float noiseX = Mathf.Abs ((float)(pos.x + offset.x) * scale);
+		float noiseY = Mathf.Abs ((float)(pos.y + offset.y) * scale);
+		float noiseZ = Mathf.Abs ((float)(pos.z + offset.z) * scale);
+
+		return Mathf.Max(0,Noise.Generate (noiseX, noiseY, noiseZ));
+
+	}
+
 
 	public virtual IEnumerator CreateVisualMesh()
 	{
@@ -126,10 +175,14 @@ public class Chunk : MonoBehaviour
 		verts.Add (corner + up + right);
 		verts.Add (corner + right);
 
-		uvs.Add (new Vector2 (0, 0));
-		uvs.Add (new Vector2 (0, 1));
-		uvs.Add (new Vector2 (1, 0));
-		uvs.Add (new Vector2 (1, 1));
+		//Vector2 uvWidth = new Vector2 (0.25f, 0.25f);
+		//Vector2 uvCorner = new Vector2 (0, 0.75f);
+
+		uvs.Add (new Vector2(0,0));
+		uvs.Add (new Vector2(0,1));
+		uvs.Add (new Vector2(1,0));
+		uvs.Add (new Vector2(1,1));
+
 
 		if (reversed) 
 		{
@@ -155,6 +208,8 @@ public class Chunk : MonoBehaviour
 
 	public bool IsTransparent (int x, int y, int z)
 	{
+		if (y < 0)
+			return true;
 		byte brick = GetByte (x, y, z);
 		switch(brick)
 		{
@@ -166,10 +221,33 @@ public class Chunk : MonoBehaviour
 
 	public virtual byte GetByte( int x, int y, int z)
 	{
-		if ((x < 0) || (y < 0) || (z < 0) || (y >= height) || (x >= width) || (z >= width)) 
+		if ((y < 0) || (y >= height))
 			return 0;
+		if ((x < 0) || (y < 0) || (z < 0) || (y >= height) || (x >= width) || (z >= width)) 
+		{
+			Vector3 worldPos = new Vector3(x,y,z) + transform.position;
+			Chunk chunk = Chunk.FindChunk(worldPos);
+			if (chunk == this)
+				return 0;
+			if (chunk == null) 
+				return GetTheoreticalByte(worldPos);
+
+			return chunk.GetByte(worldPos);
+
+		}
 		return map[x,y,z];
 	}
+
+	public virtual byte GetByte(Vector3 worldPos)
+	{
+		worldPos -= transform.position;
+		int posX = Mathf.FloorToInt (worldPos.x);
+		int posY = Mathf.FloorToInt (worldPos.y);
+		int posZ = Mathf.FloorToInt (worldPos.z);
+		return GetByte (posX, posY, posZ);
+	}
+
+
 
 	public static Chunk FindChunk(Vector3 pos)
 	{
@@ -177,7 +255,7 @@ public class Chunk : MonoBehaviour
 		{
 			Vector3 cpos = chunks[i].transform.position;
 
-			if((pos.x < cpos.x) || (pos.z < cpos.z) || (pos.x > cpos.x + width) || (pos.z > cpos.z + width))
+			if((pos.x < cpos.x) || (pos.z < cpos.z) || (pos.x >= cpos.x + width) || (pos.z >= cpos.z + width))
 				continue;
 			return chunks[i];
 		}
