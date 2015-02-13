@@ -5,8 +5,9 @@ public class World : MonoBehaviour {
 
 	public static World currentWorld;
 
-	public int chunkWidth = 60, chunkHeight = 60, seed =0;
+	public int chunkWidth = 40, chunkHeight = 60, seed =0;
 	public float viewRange = 30;
+	public float brickHeight =1;
 
 	public Chunk chunkFab;
 
@@ -34,7 +35,6 @@ public class World : MonoBehaviour {
 					Debug.Log (pos+ ":NO Chunk");
 				else
 				{
-					Debug.Log(pos + ":chunk at " + chunk.transform.position);
 					continue;
 				}
 

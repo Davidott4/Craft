@@ -5,11 +5,15 @@ using SimplexNoise;
 
 [RequireComponent (typeof(MeshRenderer))]
 [RequireComponent (typeof(MeshCollider))]
+[RequireComponent (typeof(Material))]
+
 [RequireComponent (typeof(MeshFilter))]
 
 public class Chunk : MonoBehaviour 
 {
 	public static List<Chunk> chunks = new List<Chunk>();
+
+	//static
 	public static int width
 	{
 		get { return World.currentWorld.chunkWidth;}
@@ -18,14 +22,24 @@ public class Chunk : MonoBehaviour
 	{
 		get { return World.currentWorld.chunkHeight;}
 	}
+	public static float brickHeight
+	{
+		get { return World.currentWorld.brickHeight;}
+	}
+
 	public byte[,,] map;
 
 
 	//Meshes
 	public Mesh visualMesh;
 	protected MeshRenderer meshRenderer;
+	Material[] mats;
 	protected MeshCollider meshCollider;
 	protected MeshFilter meshFilter;
+
+	static Vector3 grain0Offset;
+	static Vector3 grain1Offset;
+	static Vector3 grain2Offset;
 
 	// Use this for initialization
 	void Start () {
@@ -37,6 +51,11 @@ public class Chunk : MonoBehaviour
 
 		CalculateMapFromScratch ();
 		StartCoroutine(CreateVisualMesh());
+
+		Random.seed = World.currentWorld.seed;
+		grain0Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
+		grain1Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
+		grain2Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
 	}
 	
 	// Update is called once per frame
@@ -46,34 +65,37 @@ public class Chunk : MonoBehaviour
 
 	public static byte GetTheoreticalByte(Vector3 pos)
 	{
-		Random.seed = World.currentWorld.seed;
-		Vector3 grain0Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
-		Vector3 grain1Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
-		Vector3 grain2Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
 
-		return GetTheoreticalByte (pos, grain0Offset, grain1Offset, grain2Offset);
-	}
 
-	public static byte GetTheoreticalByte(Vector3 pos, Vector3 grain0Offset, Vector3 grain1Offset, Vector3 grain2Offset)
-	{
-
-		byte brick = 1;
-
-		float heightBase = 10;
+		float heightBase = 05;
 		float maxHeight = height - 10;
 		float heightSwing = height - heightBase;
 
+		byte brick = 1;
+
+		float clusterValue = CalculateNoiseValue(pos, grain1Offset,0.002f);
+		float blobValue = CalculateNoiseValue(pos, grain1Offset,0.005f);
 		float mountainValue = CalculateNoiseValue(pos, grain1Offset,0.009f);
+
+		//switch bricktypes
+		if ((mountainValue == 0) && (blobValue < 0.2f))
+			brick = 2;
+		else if (clusterValue > 0.9f)
+			brick = 3;
+		else if (clusterValue > 0.8f)
+			brick = 4;
+
+		mountainValue = Mathf.Sqrt (mountainValue);
 		mountainValue *= heightSwing;
 		mountainValue +=heightBase;
 		
 		mountainValue += (CalculateNoiseValue(pos, grain0Offset,0.05f) *10)-5;
-		mountainValue += CalculateNoiseValue(pos, grain2Offset,0.03f);
-		if (mountainValue > y)
+		//mountainValue += CalculateNoiseValue(pos, grain2Offset,0.03f);
+		if (mountainValue > pos.y)
 			return 1;
 		
 		//cant fall through
-		if (y <=1)
+		if (pos.y <=1)
 			return 1;
 		return 0;
 	}
@@ -81,13 +103,6 @@ public class Chunk : MonoBehaviour
 
 	public virtual void CalculateMapFromScratch()
 	{
-		Random.seed = World.currentWorld.seed;
-		Vector3 grain0Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
-		Vector3 grain1Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
-		Vector3 grain2Offset = new Vector3(Random.value * 10000, Random.value * 10000, Random.value * 10000);
-		
-
-
 
 		map = new byte[width, width, height];
 		
@@ -103,7 +118,7 @@ public class Chunk : MonoBehaviour
 		}
 	}
 
-	public virtual float CalculateNoiseValue(Vector3 pos, Vector3 offset, float scale)
+	public static float CalculateNoiseValue(Vector3 pos, Vector3 offset, float scale)
 	{
 		float noiseX = Mathf.Abs ((float)(pos.x + offset.x) * scale);
 		float noiseY = Mathf.Abs ((float)(pos.y + offset.y) * scale);
@@ -162,6 +177,7 @@ public class Chunk : MonoBehaviour
 
 		meshFilter.mesh = visualMesh;
 		meshCollider.sharedMesh = visualMesh;
+		//meshRenderer.sharedMaterial = meshRenderer.materials[1];
 		
 		yield return 0;
 	}
@@ -170,6 +186,10 @@ public class Chunk : MonoBehaviour
 	{
 		int index = verts.Count;
 
+		corner.y *= brickHeight;
+		up.y *= brickHeight;
+		right.y *= brickHeight;
+
 		verts.Add (corner);
 		verts.Add (corner + up);
 		verts.Add (corner + up + right);
@@ -177,6 +197,7 @@ public class Chunk : MonoBehaviour
 
 		//Vector2 uvWidth = new Vector2 (0.25f, 0.25f);
 		//Vector2 uvCorner = new Vector2 (0, 0.75f);
+		//uvCorner.x += (float) (brick -1) /4
 
 		uvs.Add (new Vector2(0,0));
 		uvs.Add (new Vector2(0,1));
